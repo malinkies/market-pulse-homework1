@@ -1,8 +1,10 @@
 package academy.backend.market_pulse.history.impl;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
@@ -21,7 +23,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * реализацию на свою).
  */
 public class PriceHistoryStoreSkeleton implements PriceHistoryStore {
-    private final ObjectMapper mapper = new ObjectMapper();
 
     @Override
     public Path append(Path directory, PricePoint point) {
@@ -31,7 +32,8 @@ public class PriceHistoryStoreSkeleton implements PriceHistoryStore {
                     point.timestamp().toString().replace(":", "-") +
                     ".json";
             Path path = directory.resolve(filename);
-            mapper.writeValue(path.toFile(), point);
+            String data = point.ticker() + ";" + point.timestamp() + ";" + point.price();
+            Files.writeString(path, data);
             return path;
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -50,11 +52,19 @@ public class PriceHistoryStoreSkeleton implements PriceHistoryStore {
                     .sorted().toList();
 
             for (Path path : sortedFiles) {
-                result.add(mapper.readValue(path.toFile(), PricePoint.class));
+                String data = Files.readString(path);
+                result.add(parse(data));
             }
             return result;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private PricePoint parse(String data) {
+        String[] params = data.split(";");
+        Instant timestamp = Instant.parse(params[1]);
+        BigDecimal price = new BigDecimal(params[2]);
+        return new PricePoint(params[0], timestamp, price);
     }
 }
