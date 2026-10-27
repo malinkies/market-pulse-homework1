@@ -4,15 +4,15 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
 import academy.backend.market_pulse.history.PriceHistoryStore;
 import academy.backend.market_pulse.history.PricePoint;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Заготовка для самостоятельной работы (см. «Требования к файловому хранилищу.md», семинар 7) —
@@ -30,10 +30,10 @@ public class PriceHistoryStoreSkeleton implements PriceHistoryStore {
             Files.createDirectories(directory);
             String filename = point.ticker() + "_" +
                     point.timestamp().toString().replace(":", "-") +
-                    ".json";
+                    ".txt";
             Path path = directory.resolve(filename);
             String data = point.ticker() + ";" + point.timestamp() + ";" + point.price();
-            Files.writeString(path, data);
+            Files.writeString(path, data, StandardOpenOption.CREATE_NEW);
             return path;
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -48,13 +48,15 @@ public class PriceHistoryStoreSkeleton implements PriceHistoryStore {
         List<PricePoint> result = new ArrayList<>();
         try (Stream<Path> files = Files.list(directory)) {
             List<Path> sortedFiles = files
-                    .filter(p -> p.getFileName().toString().startsWith(ticker + "_"))
-                    .sorted().toList();
+                    .filter(p -> p.getFileName().toString().startsWith(ticker + "_")).toList();
 
             for (Path path : sortedFiles) {
-                String data = Files.readString(path);
-                result.add(parse(data));
+                PricePoint point = parse(Files.readString(path));
+                if (point.ticker().equals(ticker)) {
+                    result.add(point);
+                }
             }
+            result.sort(Comparator.comparing(PricePoint::timestamp));
             return result;
         } catch (IOException e) {
             throw new RuntimeException(e);
